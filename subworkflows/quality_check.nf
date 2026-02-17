@@ -25,6 +25,7 @@ workflow QC_CONTROLS {
         ch_multiqc_files = ch_multiqc_files.mix(FASTQC.out.zip.collect{it[1]}.ifEmpty([]))
 
         KRAKEN2_KRAKEN2(input_reads_modified, params.db_kraken2, false, false)
+        ch_multiqc_files = ch_multiqc_files.mix(KRAKEN2_KRAKEN2.out.report.collect{it[1]}.ifEmpty([]))
 
         BOWTIE2_ALIGN(
             input_reads_modified, 
@@ -33,18 +34,19 @@ workflow QC_CONTROLS {
             false, 
             true
         )
+        ch_multiqc_files = ch_multiqc_files.mix(BOWTIE2_ALIGN.out.log.collect{it[1]}.ifEmpty([]))
 
         SAMTOOLS_INDEX(
-            BOWTIE2_ALIGN.output.bam
+            BOWTIE2_ALIGN.out.bam
         )
+        
+        ch_bam_for_depth = BOWTIE2_ALIGN.out.bam.join(
+                SAMTOOLS_INDEX.out.bai,
+                by: 0
+            )
 
         SAMTOOLS_DEPTH(
-            BOWTIE2_ALIGN.output.bam.combine(
-                SAMTOOLS_INDEX.output.bai,
-                by: 0
-            ).map {
-                it -> [it[0], it[1], it[2]]
-            },
+            ch_bam_for_depth,
             [[id: 'empty'], []]
         )
 
